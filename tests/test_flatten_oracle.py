@@ -1,3 +1,5 @@
+"""Regression tests for the flatten Oracle and hierarchical checker."""
+
 from __future__ import annotations
 
 import os
@@ -19,13 +21,29 @@ CASES_DIR = ROOT / "tests" / "cases"
 
 
 class FlattenOracleTests(unittest.TestCase):
+	"""Checks handwritten RTL fixtures against both equivalence strategies."""
+
 	@classmethod
 	def setUpClass(cls) -> None:
+		"""Locate Yosys once or skip the class when it is unavailable.
+
+		Raises:
+			unittest.SkipTest: If the configured Yosys executable is not found.
+		"""
+
 		cls.yosys = os.environ.get("YOSYS", "yosys")
 		if shutil.which(cls.yosys) is None:
 			raise unittest.SkipTest(f"Yosys executable not found: {cls.yosys}")
 
 	def run_case(self, name: str, expected_equivalent: bool, seq: int = 2) -> None:
+		"""Run one fixture through the full-flatten Oracle.
+
+		Args:
+			name: Fixture directory name under ``tests/cases``.
+			expected_equivalent: Expected functional equivalence result.
+			seq: Sequential depth passed to ``equiv_simple``.
+		"""
+
 		case_dir = CASES_DIR / name
 		common = case_dir / "common.v"
 		with tempfile.TemporaryDirectory(prefix=f"hier-equiv-{name}-") as work_dir:
@@ -52,6 +70,8 @@ class FlattenOracleTests(unittest.TestCase):
 				self.assertIn("unproven $equiv", log)
 
 	def test_equivalent_cases(self) -> None:
+		"""Verify that all positive fixtures are proven equivalent."""
+
 		for name in (
 			"pass_identical",
 			"pass_renamed_hierarchy",
@@ -64,6 +84,8 @@ class FlattenOracleTests(unittest.TestCase):
 				self.run_case(name, True)
 
 	def test_non_equivalent_cases(self) -> None:
+		"""Verify that all negative fixtures leave unproven equivalence cells."""
+
 		for name in (
 			"fail_internal_logic",
 			"fail_swapped_ports",
@@ -75,6 +97,8 @@ class FlattenOracleTests(unittest.TestCase):
 				self.run_case(name, False)
 
 	def test_hierarchical_results_match_oracle(self) -> None:
+		"""Require hierarchical conclusions and special paths to match the Oracle."""
+
 		cases = {
 			"pass_identical": True,
 			"pass_renamed_hierarchy": True,

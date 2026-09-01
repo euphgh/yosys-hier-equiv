@@ -23,7 +23,20 @@ _VERILOG_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_$]*$")
 
 @dataclass(frozen=True)
 class HierarchicalConfig:
-	"""Inputs for one top-down hierarchical equivalence run."""
+	"""Configures one top-down hierarchical equivalence run.
+
+	Attributes:
+		gold_sources: Verilog source files for the Gold design, in read order.
+		gate_sources: Verilog source files for the Gate design, in read order.
+		common_sources: Source files read independently into both designs.
+		include_dirs: Directories searched for Verilog include files.
+		top: Top-level module name shared by both designs.
+		seq: Sequential depth passed to ``equiv_simple``.
+		work_dir: Root directory for inventories, pair proofs, and reports.
+		yosys: Yosys executable name or path.
+		system_verilog: Whether all sources are read as SystemVerilog.
+		validate_oracle: Whether to compare the final result with the Oracle.
+	"""
 
 	gold_sources: tuple[Path, ...]
 	gate_sources: tuple[Path, ...]
@@ -39,7 +52,17 @@ class HierarchicalConfig:
 
 @dataclass(frozen=True)
 class PairResult:
-	"""One compositional or fallback proof obligation."""
+	"""Records one compositional or fallback proof obligation.
+
+	Attributes:
+		gold_module: Gold module participating in the obligation.
+		gate_module: Gate module participating in the obligation.
+		equivalent: Whether the final method proved this module pair.
+		method: Proof method, such as ``leaf`` or ``flatten-fallback``.
+		reason: Human-readable explanation of the selected method and result.
+		children: Recursive child module pairs assumed by the parent proof.
+		log_path: Yosys log for the final method used by this obligation.
+	"""
 
 	gold_module: str
 	gate_module: str
@@ -52,7 +75,15 @@ class PairResult:
 
 @dataclass(frozen=True)
 class HierarchicalResult:
-	"""Hierarchical result plus optional Golden Oracle cross-check."""
+	"""Describes a hierarchical run and its optional Oracle cross-check.
+
+	Attributes:
+		equivalent: Final equivalence result for the requested top module pair.
+		pairs: Completed module-pair obligations, including cached children.
+		report_path: Path to the generated JSON summary.
+		oracle_equivalent: Oracle result, or ``None`` when it was not requested.
+		oracle_log_path: Oracle log path, or ``None`` when it was not run.
+	"""
 
 	equivalent: bool
 	pairs: tuple[PairResult, ...]
@@ -62,22 +93,55 @@ class HierarchicalResult:
 
 	@property
 	def oracle_consistent(self) -> bool:
+		"""Return whether the hierarchical and Oracle results agree.
+
+		Returns:
+			``True`` when no Oracle was requested or both methods have the same
+			result; otherwise ``False``.
+		"""
+
 		return self.oracle_equivalent is None or self.equivalent == self.oracle_equivalent
 
 
 @dataclass(frozen=True)
 class _Inventory:
+	"""Stores the reachable module inventory for one design side.
+
+	Attributes:
+		modules: Module objects decoded from the Yosys JSON backend.
+		json_path: Path to the retained inventory JSON file.
+	"""
+
 	modules: dict[str, dict[str, Any]]
 	json_path: Path
 
 
 @dataclass
 class _PairPlan:
+	"""Describes how to prove one candidate module pair.
+
+	Attributes:
+		children: Matched child tuples containing cell name, Gold type, Gate
+			type, and whether the child implementation must be proved recursively.
+		fallback_reason: Reason to flatten the current pair, or ``None`` when a
+			compositional proof can be attempted.
+	"""
+
 	children: list[tuple[str, str, str, bool]] = field(default_factory=list)
 	fallback_reason: str | None = None
 
 
 def _as_oracle_config(config: HierarchicalConfig, work_dir: Path) -> OracleConfig:
+	"""Convert hierarchical inputs into an Oracle configuration.
+
+	Args:
+		config: Hierarchical configuration supplying shared input options.
+		work_dir: Artifact directory for the Oracle run.
+
+	Returns:
+		An Oracle configuration with the same sources and proof depth.
+	"""
+
 	return OracleConfig(
 		gold_sources=config.gold_sources,
 		gate_sources=config.gate_sources,
@@ -92,6 +156,20 @@ def _as_oracle_config(config: HierarchicalConfig, work_dir: Path) -> OracleConfi
 
 
 def _run_yosys(yosys: str, script_path: Path, log_path: Path) -> bool:
+	"""Execute one generated Yosys script and capture its output.
+
+	Args:
+		yosys: Yosys executable name or path.
+		script_path: Script passed to Yosys with ``-s``.
+		log_path: Destination for combined stdout and stderr.
+
+	Returns:
+		``True`` when Yosys exits with status zero; otherwise ``False``.
+
+	Raises:
+		OSError: If the log or Yosys process cannot be opened.
+	"""
+
 	with log_path.open("w", encoding="utf-8") as log_stream:
 		completed = subprocess.run(
 			[yosys, "-Q", "-s", str(script_path)],
@@ -103,7 +181,17 @@ def _run_yosys(yosys: str, script_path: Path, log_path: Path) -> bool:
 
 
 def _rtlil_identifier(name: str) -> str:
-	"""Return one exact RTLIL identifier token for a Yosys command."""
+	"""Return one exact RTLIL identifier token for a Yosys command.
+
+	Args:
+		name: Identifier as emitted by the Yosys JSON backend.
+
+	Returns:
+		The name prefixed with the RTLIL escape character.
+
+	Raises:
+		ValueError: If the name contains whitespace or line breaks.
+	"""
 
 	if "\n" in name or "\r" in name or any(character.isspace() for character in name):
 		raise ValueError(f"unsupported RTLIL identifier: {name!r}")
@@ -116,6 +204,23 @@ def _build_inventory(
 	side_name: str,
 	work_dir: Path,
 ) -> _Inventory:
+	"""Build and load the reachable-module inventory for one design side.
+
+	Args:
+		config: Shared hierarchical run configuration.
+		side_sources: Gold or Gate source files.
+		side_name: Stable label used in artifact filenames.
+		work_dir: Directory receiving the script, log, and JSON inventory.
+
+	Returns:
+		The decoded module mapping and retained JSON path.
+
+	Raises:
+		OSError: If an artifact or Yosys process cannot be accessed.
+		RuntimeError: If Yosys fails or emits JSON without a module mapping.
+		ValueError: If the top module name cannot be represented safely.
+	"""
+
 	script_path = work_dir / f"inventory-{side_name}.ys"
 	log_path = work_dir / f"inventory-{side_name}.log"
 	json_path = work_dir / f"inventory-{side_name}.json"
@@ -144,6 +249,15 @@ def _build_inventory(
 
 
 def _port_signature(module: dict[str, Any]) -> dict[str, tuple[str, int]]:
+	"""Extract the comparable interface signature of a Yosys JSON module.
+
+	Args:
+		module: One module object from a Yosys JSON inventory.
+
+	Returns:
+		A mapping from each port name to its direction and bit width.
+	"""
+
 	return {
 		name: (port["direction"], len(port["bits"]))
 		for name, port in module.get("ports", {}).items()
@@ -153,6 +267,16 @@ def _port_signature(module: dict[str, Any]) -> dict[str, tuple[str, int]]:
 def _hierarchical_cells(
 	module: dict[str, Any], inventory: _Inventory
 ) -> dict[str, dict[str, Any]]:
+	"""Select cells whose types are reachable implementation modules.
+
+	Args:
+		module: Parent module containing candidate cells.
+		inventory: Inventory defining the implementation module types.
+
+	Returns:
+		A mapping of hierarchical cell names to their JSON descriptions.
+	"""
+
 	return {
 		name: cell
 		for name, cell in module.get("cells", {}).items()
@@ -161,6 +285,15 @@ def _hierarchical_cells(
 
 
 def _is_blackbox(module: dict[str, Any]) -> bool:
+	"""Check whether a Yosys JSON module is an abstract box.
+
+	Args:
+		module: Module object containing Yosys attributes.
+
+	Returns:
+		``True`` for modules marked ``blackbox`` or ``whitebox``.
+	"""
+
 	attributes = module.get("attributes", {})
 	return bool(attributes.get("blackbox") or attributes.get("whitebox"))
 
@@ -171,6 +304,19 @@ def _plan_pair(
 	gold_inventory: _Inventory,
 	gate_inventory: _Inventory,
 ) -> _PairPlan:
+	"""Plan matched child obligations or request a conservative fallback.
+
+	Args:
+		gold_module: Gold parent module from its JSON inventory.
+		gate_module: Gate parent module from its JSON inventory.
+		gold_inventory: Reachable Gold modules.
+		gate_inventory: Reachable Gate modules.
+
+	Returns:
+		A pair plan containing same-name child matches, or a reason to flatten
+		the current module pair.
+	"""
+
 	if _port_signature(gold_module) != _port_signature(gate_module):
 		return _PairPlan(fallback_reason="module interfaces differ")
 
@@ -203,6 +349,16 @@ def _plan_pair(
 
 
 def _verilog_identifier(name: str) -> str:
+	"""Format a name as a regular or escaped Verilog identifier.
+
+	Args:
+		name: Identifier from a Yosys module or port object.
+
+	Returns:
+		The unchanged regular identifier, or an escaped identifier terminated
+		by the whitespace required by Verilog syntax.
+	"""
+
 	if _VERILOG_IDENTIFIER_RE.fullmatch(name):
 		return name
 	return "\\" + name + " "
@@ -213,6 +369,23 @@ def _write_stubs(
 	children: list[tuple[str, str, str, bool]],
 	gold_inventory: _Inventory,
 ) -> dict[str, str]:
+	"""Write common black-box modules for matched child instances.
+
+	Each child instance receives a distinct stub type so separate instances do
+	not accidentally share an abstract identity in the parent proof.
+
+	Args:
+		path: Destination Verilog file.
+		children: Planned child matches for the current module pair.
+		gold_inventory: Inventory used to obtain the agreed child interfaces.
+
+	Returns:
+		A mapping from child cell names to generated stub module names.
+
+	Raises:
+		OSError: If the stub file cannot be created or written.
+	"""
+
 	stub_names: dict[str, str] = {}
 	with path.open("w", encoding="ascii") as stream:
 		for index, (cell_name, gold_type, _, _) in enumerate(children):
@@ -242,6 +415,22 @@ def _write_prepared_side(
 	stub_names: dict[str, str],
 	flatten: bool,
 ) -> None:
+	"""Write commands that prepare one module for a pair proof.
+
+	Args:
+		stream: Text stream receiving Yosys commands.
+		config: Shared hierarchical run configuration.
+		side_sources: Gold or Gate source files.
+		target_module: Module to isolate as the current proof top.
+		result_module: Canonical ``gold`` or ``gate`` module name.
+		stub_path: Common stub source, or ``None`` for an unabstracted proof.
+		stub_names: Mapping from child cell names to common stub types.
+		flatten: Whether to flatten the target module subtree before comparison.
+
+	Raises:
+		ValueError: If an identifier or path cannot be represented safely.
+	"""
+
 	stream.write("design -reset-vlog\n")
 	_write_read_commands(
 		stream,
@@ -281,6 +470,25 @@ def _run_pair_proof(
 	pair_dir: Path,
 	flatten: bool,
 ) -> tuple[bool, Path]:
+	"""Generate and execute one module-pair proof.
+
+	Args:
+		config: Shared hierarchical run configuration.
+		gold_module: Gold module selected as the local proof top.
+		gate_module: Gate module selected as the local proof top.
+		children: Child matches to abstract when ``flatten`` is false.
+		gold_inventory: Inventory supplying child interfaces for stubs.
+		pair_dir: Directory retaining this proof's artifacts.
+		flatten: Whether to compare fully flattened local subtrees.
+
+	Returns:
+		A tuple containing the Yosys success flag and retained log path.
+
+	Raises:
+		OSError: If an artifact or Yosys process cannot be accessed.
+		ValueError: If an identifier or path cannot be represented safely.
+	"""
+
 	pair_dir.mkdir(parents=True, exist_ok=True)
 	script_path = pair_dir / "equiv.ys"
 	log_path = pair_dir / "equiv.log"
@@ -325,6 +533,18 @@ def _run_pair_proof(
 
 
 class _HierarchyRunner:
+	"""Recursively proves and caches module-pair obligations.
+
+	Attributes:
+		config: Shared hierarchical run configuration.
+		gold_inventory: Reachable modules in the Gold design.
+		gate_inventory: Reachable modules in the Gate design.
+		work_dir: Root directory for pair-specific artifacts.
+		results: Completed obligations keyed by module pair.
+		active: Obligations currently on the recursion stack.
+		next_pair_index: Monotonic index used for artifact directory names.
+	"""
+
 	def __init__(
 		self,
 		config: HierarchicalConfig,
@@ -332,6 +552,15 @@ class _HierarchyRunner:
 		gate_inventory: _Inventory,
 		work_dir: Path,
 	) -> None:
+		"""Initialize a recursive proof runner.
+
+		Args:
+			config: Shared hierarchical run configuration.
+			gold_inventory: Reachable modules in the Gold design.
+			gate_inventory: Reachable modules in the Gate design.
+			work_dir: Root directory for pair-specific artifacts.
+		"""
+
 		self.config = config
 		self.gold_inventory = gold_inventory
 		self.gate_inventory = gate_inventory
@@ -341,6 +570,26 @@ class _HierarchyRunner:
 		self.next_pair_index = 0
 
 	def prove(self, gold_name: str, gate_name: str) -> PairResult:
+		"""Prove one module pair using composition or local flattening.
+
+		Completed pairs are returned from the cache. A compositional proof first
+		checks the parent with common child stubs, then recursively closes every
+		child obligation. Ambiguous hierarchy or failed obligations trigger a
+		full flatten of the current module subtree.
+
+		Args:
+			gold_name: Gold module name from the Gold inventory.
+			gate_name: Gate module name from the Gate inventory.
+
+		Returns:
+			The final result and artifact path for this module pair.
+
+		Raises:
+			OSError: If proof artifacts or Yosys cannot be accessed.
+			RuntimeError: If the hierarchy is recursive or a module is missing.
+			ValueError: If an identifier cannot be represented safely.
+		"""
+
 		key = (gold_name, gate_name)
 		if key in self.results:
 			return self.results[key]
@@ -440,6 +689,15 @@ class _HierarchyRunner:
 
 
 def _write_report(result: HierarchicalResult) -> None:
+	"""Serialize a hierarchical result as stable, readable JSON.
+
+	Args:
+		result: Completed run containing pair and optional Oracle results.
+
+	Raises:
+		OSError: If the report file cannot be created or written.
+	"""
+
 	report = {
 		"equivalent": result.equivalent,
 		"oracle_equivalent": result.oracle_equivalent,
@@ -461,7 +719,19 @@ def _write_report(result: HierarchicalResult) -> None:
 
 
 def run_hierarchical_check(config: HierarchicalConfig) -> HierarchicalResult:
-	"""Run top-down compositional checks and optionally cross-check the Oracle."""
+	"""Run top-down checks and optionally cross-check the Oracle.
+
+	Args:
+		config: Sources, top module, proof depth, output, and validation options.
+
+	Returns:
+		The top-level result, all completed pair obligations, and report paths.
+
+	Raises:
+		OSError: If source files, artifacts, or Yosys cannot be accessed.
+		RuntimeError: If inventory generation or recursive proof setup fails.
+		ValueError: If the shared input configuration is invalid.
+	"""
 
 	_validate_config(_as_oracle_config(config, config.work_dir))
 	work_dir = config.work_dir.resolve()

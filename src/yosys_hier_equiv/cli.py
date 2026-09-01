@@ -12,6 +12,12 @@ from .oracle import OracleConfig, run_flatten_oracle
 
 
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
+	"""Add source and proof options shared by both subcommands.
+
+	Args:
+		parser: Subcommand parser that receives the common options.
+	"""
+
 	parser.add_argument("--gold", action="append", required=True, type=Path)
 	parser.add_argument("--gate", action="append", required=True, type=Path)
 	parser.add_argument("--common", action="append", default=[], type=Path)
@@ -23,6 +29,12 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _build_parser() -> argparse.ArgumentParser:
+	"""Build the complete command-line parser.
+
+	Returns:
+		An argument parser containing the Oracle and hierarchical subcommands.
+	"""
+
 	parser = argparse.ArgumentParser(prog="yosys-hier-equiv")
 	subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -48,6 +60,21 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+	"""Run the command-line interface.
+
+	Args:
+		argv: Optional argument sequence excluding the executable name. Passing
+			``None`` uses ``sys.argv`` through ``argparse``.
+
+	Returns:
+		Zero for an equivalent result, one for a failed proof or runtime error,
+		or three when the hierarchical result disagrees with the Oracle.
+
+	Raises:
+		SystemExit: If argument parsing fails or a caught runtime error is
+			reported through ``ArgumentParser.exit``.
+	"""
+
 	parser = _build_parser()
 	args = parser.parse_args(argv)
 
