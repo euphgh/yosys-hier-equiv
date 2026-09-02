@@ -11,7 +11,7 @@
 - 开发环境由仓库内 `EnvSetup.sh`、`.local/`（OSS CAD Suite）和 uv 管理的
   `.venv` 提供。
 - `flatten-oracle` 是完整展开 Golden Oracle；`hier-check` 是层次化递归实现。
-- 当前代码已经通过 16 个手写 RTL 场景。真实大型设计的时间和内存
+- 当前代码已经通过 17 个手写 RTL 场景。真实大型设计的时间和内存
   基线尚未验证。
 
 ## 2. 优先阅读顺序

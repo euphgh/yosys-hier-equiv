@@ -4,7 +4,7 @@
 
 文档类型：开发与验证指南。
 
-当前状态：描述 `main` 分支现有 16 个手写场景。
+当前状态：描述 `main` 分支现有 17 个手写场景。
 
 ## 1. 运行测试
 
@@ -49,6 +49,7 @@ make test YOSYS=/path/to/yosys
 | `pass_multilevel_renamed` | Pass | 三层层次、每层类型名不同，递归闭合与跨层模块对 |
 | `pass_fallback_below_top` | Pass | 中间层子模块被常量掩蔽，中间层回退通过，顶层仍组合证明通过 |
 | `pass_child_interface_diff` | Pass | 子模块端口改名导致接口不同，规划期回退后展开通过 |
+| `pass_include_header` | Pass | 通过 `-I` 搜索目录读取公共 Verilog header |
 | `fail_blackbox_mismatch` | Fail | 一侧 black box、另一侧有实现体，身份不一致触发回退且失败 |
 
 所有场景都会运行完整展开 Oracle。层次化测试还会使用
@@ -64,6 +65,7 @@ tests/
       gold.v
       gate.v
       common.v            # 可选
+      include/            # 可选，通过 -I 读取的 header
     fail_<scenario>/
       gold.v
       gate.v
@@ -136,8 +138,11 @@ python3 -m compileall -q src tests
 
 ## 6. 尚需补充的验证
 
+- `fail_implicit_blackbox_connection` 当前作为 expected-failure 测试保留：两侧同名
+  未定义模块的对应端口连接必须逐一完成功能等价检查，不能把 inventory 错误当作
+  普通 Fail，也不能在局部展开时丢失 black-box 边界。
 - 真实大型设计的正确性与性能基线
-- include 目录和混合 Verilog/SystemVerilog 工程
+- 混合 Verilog/SystemVerilog 工程
 - 显式 black box 的正向和错误接口场景
 - 多层参数派生模块和重复 ModulePair
 - 大型 memory 的资源与证明行为

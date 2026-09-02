@@ -109,6 +109,9 @@ yosys-hier-equiv hier-check \
 工具不自动搜索依赖。`hierarchy -check` 要求所有可达模块都有定义或显式 black-box
 声明，否则 inventory 阶段会失败。
 
+Yosys 的命令语法要求 include 目录以单个裸 `-Idir` token 传递。工具会正确生成该
+格式；包含空白或命令控制字符、无法安全表示为裸 token 的目录路径会被拒绝。
+
 ### 3.4 SystemVerilog
 
 使用 `--sv` 后，所有 Gold、Gate 和公共源码都会通过 `read_verilog -sv` 读取：

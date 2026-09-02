@@ -75,6 +75,35 @@ def _yosys_quote(value: str) -> str:
 	return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
+def _yosys_include_option(include_dir: Path) -> str:
+	"""Format an include directory for Yosys ``read_verilog -Idir``.
+
+	Yosys requires the directory to be attached directly to ``-I`` and does
+	not remove quotes embedded in that option token. Therefore include paths
+	must be emitted as bare tokens and paths containing command separators or
+	whitespace must be rejected instead of generating a silently broken script.
+
+	Args:
+		include_dir: Include directory to resolve and format.
+
+	Returns:
+		A single Yosys option token in ``-I/absolute/path`` form.
+
+	Raises:
+		ValueError: If the resolved path cannot be represented as a safe bare
+			Yosys command token.
+	"""
+
+	value = str(include_dir.resolve())
+	unsafe_characters = {'"', "'", "\\", ";", "#"}
+	if any(character.isspace() or character in unsafe_characters for character in value):
+		raise ValueError(
+			"include directory path cannot be represented safely for Yosys -I: "
+			f"{value!r}"
+		)
+	return "-I" + value
+
+
 def _validate_config(config: OracleConfig) -> None:
 	"""Validate required sources and scalar Oracle options.
 
@@ -125,7 +154,7 @@ def _write_read_commands(
 	if system_verilog:
 		options.append("-sv")
 	for include_dir in include_dirs:
-		options.append("-I" + _yosys_quote(str(include_dir.resolve())))
+		options.append(_yosys_include_option(include_dir))
 
 	prefix = "read_verilog"
 	if options:

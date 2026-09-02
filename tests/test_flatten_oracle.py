@@ -46,12 +46,14 @@ class FlattenOracleTests(unittest.TestCase):
 
 		case_dir = CASES_DIR / name
 		common = case_dir / "common.v"
+		include_dir = case_dir / "include"
 		with tempfile.TemporaryDirectory(prefix=f"hier-equiv-{name}-") as work_dir:
 			result = run_flatten_oracle(
 				OracleConfig(
 					gold_sources=(case_dir / "gold.v",),
 					gate_sources=(case_dir / "gate.v",),
 					common_sources=(common,) if common.is_file() else (),
+					include_dirs=(include_dir,) if include_dir.is_dir() else (),
 					top="top",
 					seq=seq,
 					work_dir=Path(work_dir),
@@ -83,6 +85,7 @@ class FlattenOracleTests(unittest.TestCase):
 			"pass_multilevel_renamed",
 			"pass_fallback_below_top",
 			"pass_child_interface_diff",
+			"pass_include_header",
 		):
 			with self.subTest(name=name):
 				self.run_case(name, True)
@@ -101,6 +104,56 @@ class FlattenOracleTests(unittest.TestCase):
 			with self.subTest(name=name):
 				self.run_case(name, False)
 
+	@unittest.expectedFailure
+	def test_implicit_blackbox_connection_mismatch(self) -> None:
+		"""Require undefined black-box boundary connections to be compared.
+
+		This pending test distinguishes a functional mismatch from an input error:
+		both strategies must complete and report non-equivalence when the same
+		undefined module input is connected to ``a`` on Gold and ``b`` on Gate.
+		"""
+
+		case_dir = CASES_DIR / "fail_implicit_blackbox_connection"
+		problems: list[str] = []
+		with tempfile.TemporaryDirectory(
+			prefix="implicit-blackbox-oracle-"
+		) as oracle_work_dir:
+			oracle = run_flatten_oracle(
+				OracleConfig(
+					gold_sources=(case_dir / "gold.v",),
+					gate_sources=(case_dir / "gate.v",),
+					top="top",
+					work_dir=Path(oracle_work_dir),
+					yosys=self.yosys,
+				)
+			)
+			oracle_log = oracle.log_path.read_text(encoding="utf-8")
+			if oracle.equivalent or "unproven $equiv" not in oracle_log:
+				problems.append(
+					"Oracle did not complete a functional non-equivalence proof"
+				)
+
+		with tempfile.TemporaryDirectory(
+			prefix="implicit-blackbox-hier-"
+		) as hierarchy_work_dir:
+			try:
+				hierarchy = run_hierarchical_check(
+					HierarchicalConfig(
+						gold_sources=(case_dir / "gold.v",),
+						gate_sources=(case_dir / "gate.v",),
+						top="top",
+						work_dir=Path(hierarchy_work_dir),
+						yosys=self.yosys,
+					)
+				)
+			except RuntimeError as error:
+				problems.append(f"hierarchical inventory failed: {error}")
+			else:
+				if hierarchy.equivalent:
+					problems.append("hierarchical check accepted mismatched connections")
+
+		self.assertEqual(problems, [])
+
 	def test_hierarchical_results_match_oracle(self) -> None:
 		"""Require hierarchical conclusions and special paths to match the Oracle."""
 
@@ -115,6 +168,7 @@ class FlattenOracleTests(unittest.TestCase):
 			"pass_multilevel_renamed": True,
 			"pass_fallback_below_top": True,
 			"pass_child_interface_diff": True,
+			"pass_include_header": True,
 			"fail_internal_logic": False,
 			"fail_swapped_ports": False,
 			"fail_missing_instance": False,
@@ -126,6 +180,7 @@ class FlattenOracleTests(unittest.TestCase):
 			with self.subTest(name=name):
 				case_dir = CASES_DIR / name
 				common = case_dir / "common.v"
+				include_dir = case_dir / "include"
 				with tempfile.TemporaryDirectory(
 					prefix=f"hier-check-{name}-"
 				) as work_dir:
@@ -134,6 +189,9 @@ class FlattenOracleTests(unittest.TestCase):
 							gold_sources=(case_dir / "gold.v",),
 							gate_sources=(case_dir / "gate.v",),
 							common_sources=(common,) if common.is_file() else (),
+							include_dirs=(
+								(include_dir,) if include_dir.is_dir() else ()
+							),
 							top="top",
 							seq=2,
 							work_dir=Path(work_dir),

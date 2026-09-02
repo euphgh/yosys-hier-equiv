@@ -41,7 +41,7 @@ yosys-hier-equiv hier-check \
 
 ## 我要增加或修改测试
 
-阅读 [测试指南](testing.md)。它列出当前 11 个手写场景，以及新增 fixture、更新
+阅读 [测试指南](testing.md)。它列出当前 17 个手写场景，以及新增 fixture、更新
 断言和验证回退行为的方法。
 
 ## 我要继续开发算法或 CLI
