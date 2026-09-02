@@ -278,8 +278,8 @@ hierarchical_result == oracle_result
 - 每个模块对重新读取源码，性能尚未针对大型设计优化。
 - `memory` 可能把 memory 转为寄存器和 mux，显著放大设计。
 - `equiv_simple -seq N` 不是任意复杂时序系统的完备证明。
-- 完整展开 Oracle 目前只在手写小型场景上作为 Golden 验证，真实
-  `emu_system.v` 基线仍未建立。
+- 完整展开 Oracle 目前只在手写小型场景上作为 Golden 验证，真实大型设计
+  基线仍未建立。
 
 后续实现路线见 [开发指南](development.md)，当前验证覆盖见
 [测试指南](testing.md)。

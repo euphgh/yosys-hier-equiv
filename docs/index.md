@@ -18,10 +18,10 @@
 - 所有 CLI 参数、退出码和工作目录产物
 - 如何从 `report.json` 和 Yosys 日志定位失败
 
-第一次使用建议运行：
+第一次使用建议先在仓库根目录 `source EnvSetup.sh` 加载环境，然后运行：
 
 ```bash
-PYTHONPATH=src python3 -m yosys_hier_equiv hier-check \
+yosys-hier-equiv hier-check \
   --gold gold.v \
   --gate gate.v \
   --top top \
@@ -77,7 +77,7 @@ PYTHONPATH=src python3 -m yosys_hier_equiv hier-check \
 
 当前尚未验证：
 
-- 真实大型 `emu_system.v` 的时间和内存开销
+- 真实大型设计的时间和内存开销
 - 不同实例名之间不依赖展开的自动匹配
 - 大型 memory 和复杂时序设计的完备证明
 - 长期驻留 Yosys 或多模块对批处理的性能收益

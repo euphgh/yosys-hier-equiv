@@ -1,8 +1,8 @@
 # Yosys Hierarchical Equivalence
 
-`yosys-hier-equiv` 是一个基于 Yosys 的层次化 Verilog 等价检查工具。它最初用于
-比较 REMUS transform 生成的两份 `emu_system.v`，但实现不依赖 REMUS，可以作为
-独立 Python 项目使用。
+`yosys-hier-equiv` 是一个基于 Yosys 的层次化 Verilog 等价检查工具，用于判断两份
+应当功能等价的 Verilog/SystemVerilog 设计（例如自动生成流程产出的 Gold 与 Gate
+两份 RTL）是否真的等价。它是自包含的独立 Python 项目，不依赖任何外部工作区。
 
 工具提供两条互补路径：
 
@@ -12,31 +12,36 @@
   时，只展开当前模块子树。可选用 Oracle 对照最终结论。
 
 当前版本是可运行的开发原型。11 个手写 RTL 场景已经覆盖基础等价、模块改名、
-连接错误、参数错误、时序错误、层次回退和模块对缓存；真实大型
-`emu_system.v` 的性能边界尚未建立。
+连接错误、参数错误、时序错误、层次回退和模块对缓存；真实大型设计的性能边界
+尚未建立。
 
 ## 环境要求
 
-- Python 3.10 或更新版本
-- 可从 `PATH` 找到的 Yosys
+- [uv](https://docs.astral.sh/uv/)，用于创建和管理 Python 虚拟环境
 - GNU Make，仅在运行仓库测试时需要
 
-在 REMUS workspace 中可以使用已有环境：
+Yosys 由仓库自带的 OSS CAD Suite（`.local/`）提供，无需系统安装。在仓库根目录
+执行：
 
 ```bash
-cd /home/hgh/remuws/remu
 source EnvSetup.sh
-cd yosys-hier-equiv
 ```
 
-独立使用时，只需自行保证 `python3` 和 `yosys` 可用。
+首次运行时脚本会用 `uv sync` 创建 `.venv` 并以 editable 模式安装本工具，然后把
+`.venv/bin` 和 `.local/bin` 加入 `PATH`，并导出 `YOSYS` 环境变量。脚本可重复
+source，幂等。
 
 ## 快速开始
 
 推荐先运行层次化检查，并用完整展开 Oracle 对照：
 
+以下示例使用 EnvSetup.sh 安装的 `yosys-hier-equiv` 命令，它与
+`python3 -m yosys_hier_equiv` 等价。
+
+推荐先运行层次化检查，并用完整展开 Oracle 对照：
+
 ```bash
-PYTHONPATH=src python3 -m yosys_hier_equiv hier-check \
+yosys-hier-equiv hier-check \
   --gold path/to/gold.v \
   --gate path/to/gate.v \
   --top top \
@@ -47,18 +52,11 @@ PYTHONPATH=src python3 -m yosys_hier_equiv hier-check \
 只运行完整展开 Oracle：
 
 ```bash
-PYTHONPATH=src python3 -m yosys_hier_equiv flatten-oracle \
+yosys-hier-equiv flatten-oracle \
   --gold path/to/gold.v \
   --gate path/to/gate.v \
   --top top \
   --work-dir build/my-oracle
-```
-
-也可以安装命令行入口：
-
-```bash
-python3 -m pip install -e .
-yosys-hier-equiv --help
 ```
 
 多个源码、公共源码、include 目录、SystemVerilog 和时序深度等用法见
@@ -81,11 +79,12 @@ yosys-hier-equiv --help
 ## 测试
 
 ```bash
+source EnvSetup.sh
 make test
 ```
 
-测试需要真实 Yosys。测试场景、预期结果和新增测试方法见
-[测试指南](docs/testing.md)。
+Yosys 由 `.local/` 提供；如需使用其他 Yosys，可用 `make test YOSYS=/path/to/yosys`
+覆盖。测试场景、预期结果和新增测试方法见 [测试指南](docs/testing.md)。
 
 ## 文档
 

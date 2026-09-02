@@ -4,3 +4,9 @@ __pycache__/
 build/
 dist/
 
+# uv-managed Python virtualenv
+.venv/
+
+# Locally extracted OSS CAD Suite toolchain and its tarball
+/.local/
+/oss-cad-suite-*.tgz

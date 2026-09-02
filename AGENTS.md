@@ -5,12 +5,13 @@
 
 ## 1. 项目定位
 
-- 本项目是独立的 Yosys 层次化 Verilog 等价检查工具。
+- 本项目是自包含的独立 Yosys 层次化 Verilog 等价检查工具，不依赖任何外部
+  工作区、私有包或系统级 Yosys 安装。
 - 当前默认分支是 `main`。
-- 项目最初服务于 REMUS transform 回归，但代码不得依赖 REMUS Python 包或目录
-  布局。
+- 开发环境由仓库内 `EnvSetup.sh`、`.local/`（OSS CAD Suite）和 uv 管理的
+  `.venv` 提供。
 - `flatten-oracle` 是完整展开 Golden Oracle；`hier-check` 是层次化递归实现。
-- 当前代码已经通过 11 个手写 RTL 场景。真实大型 `emu_system.v` 的时间和内存
+- 当前代码已经通过 11 个手写 RTL 场景。真实大型设计的时间和内存
   基线尚未验证。
 
 ## 2. 优先阅读顺序
@@ -75,6 +76,13 @@
 
 ## 6. 开发流程
 
+进入仓库后先在根目录加载环境（首次运行会自动用 `uv sync` 创建 `.venv` 并以
+editable 模式安装本工具）：
+
+```bash
+source EnvSetup.sh
+```
+
 修改前：
 
 1. 确认改动属于 CLI、Oracle、层次算法、测试还是文档。
@@ -86,16 +94,7 @@
 ```bash
 make test
 python3 -m compileall -q src tests
-PYTHONPATH=src python3 -m yosys_hier_equiv --help
-```
-
-在 REMUS workspace 中，Yosys 环境通常通过以下方式加载：
-
-```bash
-cd /home/hgh/remuws/remu
-source EnvSetup.sh
-cd yosys-hier-equiv
-make test
+python3 -m yosys_hier_equiv --help
 ```
 
 如果环境中没有 Yosys，单元测试会被跳过。这不能作为有效验证；交付时必须明确
@@ -119,8 +118,8 @@ make test
 - 生成的 Yosys 脚本和日志是公共调试接口；修改文件布局时同步更新文档和测试。
 - README 只保留项目入口和快速开始；详细内容放入 `docs/`。
 - 文档必须区分当前支持、已知限制和未来计划。
-- 本仓库目前不使用 Sphinx。新增 Markdown 后应检查相对链接，而不是依赖 REMUS
-  父仓库的文档构建。
+- 本仓库目前不使用 Sphinx。新增 Markdown 后应检查相对链接，而不是依赖外部
+  文档构建系统。
 
 ## 9. 已知限制
 
@@ -128,14 +127,14 @@ make test
 - 不同实例名之间没有结构签名匹配，直接触发局部展开。
 - 每个模块对重新读取源码并启动 Yosys，性能开销较大。
 - `memory` 和 `equiv_simple -seq N` 对大型 memory、复杂状态机并不完备。
-- 尚未用真实 REMUS `emu_system.v` 建立正确性和性能回归。
+- 尚未用真实大型设计建立正确性和性能回归。
 - black box 依赖用户提供正确且一致的接口定义。
 
 ## 10. 后续工作优先级
 
 默认优先级：
 
-1. 使用真实 `emu_system.v` 建立 Oracle 与 `hier-check` 的时间、内存和结果基线。
+1. 选择一个真实大型设计，建立 Oracle 与 `hier-check` 的时间、内存和结果基线。
 2. 针对真实失败补最小 fixture，不直接围绕大型样例反复修改算法。
 3. 评估模块对批处理或长期驻留 Yosys，减少重复读取源码的成本。
 4. 再考虑不同实例名的保守结构签名匹配和多对多层次映射。
@@ -150,5 +149,3 @@ make test
 - 实际运行了哪些测试
 - 哪些结论来自测试，哪些仍是推断
 - 是否改变了已知限制或后续优先级
-
-不要修改或清理父 REMUS 仓库中的无关工作区变更。

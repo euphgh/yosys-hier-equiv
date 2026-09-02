@@ -10,38 +10,24 @@
 
 需要：
 
-- Python 3.10 或更新版本
-- Yosys，并且可从 `PATH` 找到
+- [uv](https://docs.astral.sh/uv/)，用于创建和管理 Python 虚拟环境
+
+Yosys 由仓库自带的 OSS CAD Suite（`.local/`）提供，无需系统安装。在仓库根目录
+加载环境，首次运行会自动创建 `.venv` 并以 editable 模式安装本工具：
+
+```bash
+source EnvSetup.sh
+```
 
 检查环境：
 
 ```bash
-python3 --version
 yosys -V
-```
-
-在 REMUS workspace 中：
-
-```bash
-cd /home/hgh/remuws/remu
-source EnvSetup.sh
-cd yosys-hier-equiv
-```
-
-从源码运行时使用：
-
-```bash
-PYTHONPATH=src python3 -m yosys_hier_equiv --help
-```
-
-也可以安装 editable package：
-
-```bash
-python3 -m pip install -e .
 yosys-hier-equiv --help
 ```
 
-后续示例使用源码运行方式。安装后可把命令前缀替换为 `yosys-hier-equiv`。
+后续示例统一使用 `yosys-hier-equiv` 命令，它与 `python3 -m yosys_hier_equiv`
+完全等价。
 
 ## 2. 选择检查模式
 
@@ -52,7 +38,7 @@ yosys-hier-equiv --help
 开发阶段建议总是添加 `--validate-oracle`：
 
 ```bash
-PYTHONPATH=src python3 -m yosys_hier_equiv hier-check \
+yosys-hier-equiv hier-check \
   --gold gold.v \
   --gate gate.v \
   --top top \
@@ -66,7 +52,7 @@ PYTHONPATH=src python3 -m yosys_hier_equiv hier-check \
 但大型设计可能消耗更多时间和内存。
 
 ```bash
-PYTHONPATH=src python3 -m yosys_hier_equiv flatten-oracle \
+yosys-hier-equiv flatten-oracle \
   --gold gold.v \
   --gate gate.v \
   --top top \
@@ -80,16 +66,16 @@ PYTHONPATH=src python3 -m yosys_hier_equiv flatten-oracle \
 每个 `--gold` 或 `--gate` 只接收一个文件，多个文件需要重复参数：
 
 ```bash
-PYTHONPATH=src python3 -m yosys_hier_equiv hier-check \
+yosys-hier-equiv hier-check \
   --gold gold/pkg.v \
   --gold gold/generated_cells.v \
-  --gold gold/emu_system.v \
+  --gold gold/design.v \
   --gate gate/pkg.v \
   --gate gate/generated_cells.v \
-  --gate gate/emu_system.v \
-  --top emu_system \
+  --gate gate/design.v \
+  --top design \
   --validate-oracle \
-  --work-dir build/emu-system-check
+  --work-dir build/multi-source-check
 ```
 
 同一侧的参数顺序就是 `read_verilog` 的读取顺序。
@@ -138,7 +124,7 @@ PYTHONPATH=src python3 -m yosys_hier_equiv hier-check \
 `--top` 指定两侧共同的顶层模块名：
 
 ```bash
-  --top emu_system
+  --top design
 ```
 
 当前要求 Gold 和 Gate 顶层同名，并且名称是普通 Verilog identifier。子模块名称
@@ -169,8 +155,8 @@ PYTHONPATH=src python3 -m yosys_hier_equiv hier-check \
 实时参数以命令帮助为准：
 
 ```bash
-PYTHONPATH=src python3 -m yosys_hier_equiv hier-check --help
-PYTHONPATH=src python3 -m yosys_hier_equiv flatten-oracle --help
+yosys-hier-equiv hier-check --help
+yosys-hier-equiv flatten-oracle --help
 ```
 
 ## 5. 工作目录产物

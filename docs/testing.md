@@ -8,6 +8,8 @@
 
 ## 1. 运行测试
 
+先在仓库根目录 `source EnvSetup.sh` 加载 Python 虚拟环境和 Yosys，然后：
+
 ```bash
 make test
 ```
@@ -127,7 +129,7 @@ python3 -m compileall -q src tests
 
 ## 6. 尚需补充的验证
 
-- 真实 REMUS `emu_system.v` 正确性与性能基线
+- 真实大型设计的正确性与性能基线
 - include 目录和混合 Verilog/SystemVerilog 工程
 - 显式 black box 的正向和错误接口场景
 - 多层参数派生模块和重复 ModulePair

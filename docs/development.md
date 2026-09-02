@@ -124,7 +124,7 @@ cli.main
 ```bash
 make test
 python3 -m compileall -q src tests
-PYTHONPATH=src python3 -m yosys_hier_equiv --help
+python3 -m yosys_hier_equiv --help
 ```
 
 CLI 或产物变化还应手动运行一个 Pass 和一个 Fail fixture，检查退出码、
@@ -185,7 +185,7 @@ inventory-gate.log
 
 ### 优先级 1：真实设计基线
 
-使用同一组真实 `emu_system.v` 输入分别运行：
+使用同一组真实大型设计输入分别运行：
 
 1. `flatten-oracle`
 2. `hier-check`
