@@ -71,8 +71,10 @@ yosys-hier-equiv hier-check \
 - 基于相同实例名发现层次模块对
 - 参数派生模块名和不同模块名之间的递归证明
 - 父模块共同 stub 抽象
+- 两侧相同类型 black box 的共同假设
 - ModulePair 缓存
 - 实例集合变化、父证明失败和子证明失败时的局部展开
+- 回退通过时的 Warning 报告
 - 层次化结果与 Oracle 对照
 
 当前尚未验证：

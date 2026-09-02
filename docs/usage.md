@@ -204,6 +204,7 @@ yosys-hier-equiv flatten-oracle --help
 - `oracle_equivalent`：Oracle 结果；未运行时为 `null`。
 - `oracle_consistent`：两种算法是否一致。
 - `oracle_log_path`：Oracle 日志路径。
+- `warnings`：全部模块对 Warning 的聚合，按处理顺序排列，不去重。
 - `pairs`：已处理模块对。
 
 每个模块对包含：
@@ -214,6 +215,7 @@ yosys-hier-equiv flatten-oracle --help
 - `reason`
 - `children`
 - `log_path`
+- `warnings`：该模块对自身的 Warning 列表；失败或组合证明完全闭合时为空。
 
 `method` 可能为：
 
@@ -239,6 +241,11 @@ yosys-hier-equiv flatten-oracle --help
 - CLI 输出 `FAIL:`：Yosys 完成但未证明等价。
 - CLI 输出 `error:`：输入检查、inventory 或 Yosys 执行出现错误。
 - 最终判断仍应查看对应日志。
+
+Pass 伴随 Warning 仍返回 `0`。当某个模块对没有组合证明闭合、只靠局部展开通过时
+（例如子模块独立不等价但被父级连接约束掩蔽），CLI 会在 `PASS:` 行前逐条输出
+`WARNING:`，`report.json` 的 `warnings` 字段记录相同内容。Warning 不改变结论；
+判断整个设计仍以顶层 `equivalent` 为准。
 
 ## 8. 推荐运行流程
 

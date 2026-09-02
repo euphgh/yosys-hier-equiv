@@ -4,7 +4,7 @@
 
 文档类型：开发与验证指南。
 
-当前状态：描述 `main` 分支现有 11 个手写场景。
+当前状态：描述 `main` 分支现有 16 个手写场景。
 
 ## 1. 运行测试
 
@@ -45,6 +45,11 @@ make test YOSYS=/path/to/yosys
 | `fail_missing_instance` | Fail | 可观察实例被删除 |
 | `fail_parameter` | Fail | 参数化模块选择不同功能 |
 | `fail_sequential_connection` | Fail | 寄存器数据输入从 `a` 接成 `b` |
+| `pass_blackbox_common` | Pass | 两侧相同类型的显式 black box 作为共同假设，不递归证明 |
+| `pass_multilevel_renamed` | Pass | 三层层次、每层类型名不同，递归闭合与跨层模块对 |
+| `pass_fallback_below_top` | Pass | 中间层子模块被常量掩蔽，中间层回退通过，顶层仍组合证明通过 |
+| `pass_child_interface_diff` | Pass | 子模块端口改名导致接口不同，规划期回退后展开通过 |
+| `fail_blackbox_mismatch` | Fail | 一侧 black box、另一侧有实现体，身份不一致触发回退且失败 |
 
 所有场景都会运行完整展开 Oracle。层次化测试还会使用
 `validate_oracle=True`，要求方案 3 与 Oracle 结论一致。
@@ -71,7 +76,8 @@ tests/
 2. 所有 Fail fixture 必须由 Oracle 留下未证明的 `$equiv`。
 3. 每个 fixture 的层次化结果必须符合预期，并与 Oracle 一致。
 
-回退和缓存场景还检查 `PairResult.method` 或模块对数量。
+回退、缓存、Warning 或报告相关改动还需要检查 `PairResult.method`、
+`PairResult.warnings`、模块对数量或 `report.json`，不能只看进程退出码。
 
 ## 4. 新增测试
 
@@ -120,6 +126,7 @@ python3 -m compileall -q src tests
 ## 5. 测试设计原则
 
 - Pass 场景验证可观察功能等价，而不是文本相同。
+- Pass 但依赖回退的场景必须断言 `warnings` 内容；失败场景必须断言无 Warning。
 - Fail 场景中的差异必须能传播到顶层可观察输出或状态。
 - 如果差异是死逻辑，Yosys 可能优化掉并正确判定 Pass。
 - 测试层次匹配时，要区分模块类型名和实例名；当前只有相同实例名自动配对。

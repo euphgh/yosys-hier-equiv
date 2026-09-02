@@ -79,6 +79,10 @@ class FlattenOracleTests(unittest.TestCase):
 			"pass_hierarchy_fallback",
 			"pass_parent_context",
 			"pass_reused_pair",
+			"pass_blackbox_common",
+			"pass_multilevel_renamed",
+			"pass_fallback_below_top",
+			"pass_child_interface_diff",
 		):
 			with self.subTest(name=name):
 				self.run_case(name, True)
@@ -92,6 +96,7 @@ class FlattenOracleTests(unittest.TestCase):
 			"fail_missing_instance",
 			"fail_parameter",
 			"fail_sequential_connection",
+			"fail_blackbox_mismatch",
 		):
 			with self.subTest(name=name):
 				self.run_case(name, False)
@@ -106,11 +111,16 @@ class FlattenOracleTests(unittest.TestCase):
 			"pass_hierarchy_fallback": True,
 			"pass_parent_context": True,
 			"pass_reused_pair": True,
+			"pass_blackbox_common": True,
+			"pass_multilevel_renamed": True,
+			"pass_fallback_below_top": True,
+			"pass_child_interface_diff": True,
 			"fail_internal_logic": False,
 			"fail_swapped_ports": False,
 			"fail_missing_instance": False,
 			"fail_parameter": False,
 			"fail_sequential_connection": False,
+			"fail_blackbox_mismatch": False,
 		}
 		for name, expected_equivalent in cases.items():
 			with self.subTest(name=name):
@@ -134,12 +144,66 @@ class FlattenOracleTests(unittest.TestCase):
 					self.assertEqual(result.equivalent, expected_equivalent)
 					self.assertTrue(result.oracle_consistent)
 					self.assertTrue(result.report_path.is_file())
+					if not expected_equivalent:
+						self.assertEqual(result.warnings, ())
 					if name == "pass_hierarchy_fallback":
 						self.assertEqual(result.pairs[-1].method, "flatten-fallback")
+						self.assertEqual(len(result.pairs[-1].warnings), 1)
+						self.assertIn(
+							"pass relies on local flattening",
+							result.pairs[-1].warnings[0],
+						)
 					if name == "pass_parent_context":
 						self.assertEqual(result.pairs[-1].method, "flatten-fallback")
+						self.assertEqual(len(result.pairs[-1].warnings), 1)
+						self.assertIn(
+							"(gold_stage, gate_stage)",
+							result.pairs[-1].warnings[0],
+						)
+						child = next(
+							pair
+							for pair in result.pairs
+							if pair.gold_module == "gold_stage"
+						)
+						self.assertFalse(child.equivalent)
+						self.assertEqual(child.warnings, ())
+						self.assertEqual(result.warnings, result.pairs[-1].warnings)
 					if name == "pass_reused_pair":
 						self.assertEqual(len(result.pairs), 2)
+					if name == "pass_blackbox_common":
+						self.assertEqual(len(result.pairs), 1)
+						self.assertEqual(result.pairs[-1].method, "compositional")
+						self.assertEqual(result.pairs[-1].children, ())
+					if name == "pass_multilevel_renamed":
+						self.assertEqual(len(result.pairs), 3)
+						self.assertTrue(all(pair.equivalent for pair in result.pairs))
+						self.assertEqual(result.pairs[-1].method, "compositional")
+					if name == "pass_fallback_below_top":
+						self.assertEqual(len(result.pairs), 3)
+						top_pair = result.pairs[-1]
+						self.assertEqual(top_pair.method, "compositional")
+						self.assertEqual(top_pair.warnings, ())
+						wrap_pair = next(
+							pair
+							for pair in result.pairs
+							if pair.gold_module == "gold_wrap"
+						)
+						self.assertEqual(wrap_pair.method, "flatten-fallback")
+						self.assertTrue(wrap_pair.equivalent)
+						self.assertEqual(len(wrap_pair.warnings), 1)
+						self.assertIn(
+							"(gold_stage, gate_stage)", wrap_pair.warnings[0]
+						)
+						stage_pair = next(
+							pair
+							for pair in result.pairs
+							if pair.gold_module == "gold_stage"
+						)
+						self.assertFalse(stage_pair.equivalent)
+						self.assertEqual(result.warnings, wrap_pair.warnings)
+					if name == "pass_child_interface_diff":
+						self.assertEqual(result.pairs[-1].method, "flatten-fallback")
+						self.assertEqual(len(result.pairs[-1].warnings), 1)
 
 
 if __name__ == "__main__":

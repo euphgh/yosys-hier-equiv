@@ -11,7 +11,7 @@
 - 开发环境由仓库内 `EnvSetup.sh`、`.local/`（OSS CAD Suite）和 uv 管理的
   `.venv` 提供。
 - `flatten-oracle` 是完整展开 Golden Oracle；`hier-check` 是层次化递归实现。
-- 当前代码已经通过 11 个手写 RTL 场景。真实大型设计的时间和内存
+- 当前代码已经通过 16 个手写 RTL 场景。真实大型设计的时间和内存
   基线尚未验证。
 
 ## 2. 优先阅读顺序
@@ -73,6 +73,8 @@
 8. ModulePair 缓存键是 `(gold_module, gate_module)`，允许模块名不同。
 9. 两侧相同类型的显式 black box 可以作为共同假设，但不递归检查其内部。
 10. `--validate-oracle` 发现两种算法结论不一致时必须独立报错，不能静默选择一侧。
+11. Pass 但非组合证明闭合（回退通过）的模块对必须产生英文 Warning；Warning 不
+    改变结论和退出码，判断仍以顶层 `equivalent` 为准。
 
 ## 6. 开发流程
 
@@ -107,8 +109,8 @@ python3 -m yosys_hier_equiv --help
 - 每个场景至少包含 `gold.v` 和 `gate.v`；两侧共用定义放入 `common.v`。
 - 等价场景必须由 Oracle 和层次化实现都判定 Pass。
 - 不等价场景必须由两者都判定 Fail。
-- 回退、缓存或报告相关改动还需要检查 `PairResult.method`、模块对数量或
-  `report.json`，不能只看进程退出码。
+- 回退、缓存、Warning 或报告相关改动还需要检查 `PairResult.method`、
+  `PairResult.warnings`、模块对数量或 `report.json`，不能只看进程退出码。
 - 新测试应证明一个明确语义，不要用大型生成 RTL 替代最小复现。
 
 ## 8. 编码与文档规则

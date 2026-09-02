@@ -119,6 +119,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 			)
 			return 3
 		if result.equivalent:
+			for warning in result.warnings:
+				print(f"WARNING: {warning}")
 			print(
 				f"PASS: equivalent across {len(result.pairs)} module pair(s); "
 				f"report: {result.report_path}"

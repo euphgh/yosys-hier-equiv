@@ -239,6 +239,19 @@ Parent:      b = 0
 失败，父级子树展开则能证明顶层等价。报告会同时保留失败 child 和通过的父级回退，
 因此最终结果必须读取顶层 `equivalent`，不能要求所有 pair 都为 true。
 
+### 10.1 回退通过时的 Warning
+
+回退证明通过且最终结论为 Pass，但该模块对没有组合证明闭合时，工具为该模块对记录
+Warning。Warning 同时出现在 `report.json` 和 CLI 输出中。三种触发路径：
+
+1. 层次无法可靠匹配，规划期直接进入回退并通过。
+2. 父级共同 stub 证明失败，局部展开通过。
+3. 递归子模块义务失败（例如子模块独立不等价，但父级将其输入接常量掩蔽），
+   局部展开通过。此时每个失败的子对各产生一条 Warning，点名该子对。
+
+Warning 只说明该 Pass 的证明强度弱于组合证明，不改变结论，也不影响退出码。
+判断整个设计时仍以顶层 `equivalent` 为准。
+
 ## 11. Oracle 对照
 
 `hier-check --validate-oracle` 在层次化结果完成后运行一次全设计 Oracle：
@@ -265,8 +278,10 @@ hierarchical_result == oracle_result
 - 进入该方法的原因
 - 递归 child ModulePair
 - 最终使用的 Yosys 日志
+- 回退通过时的 Warning 列表
 
-`HierarchicalResult` 记录顶层结论、全部模块对、报告路径以及可选 Oracle 结果。
+`HierarchicalResult` 记录顶层结论、全部模块对、报告路径、可选 Oracle 结果，以及
+全部模块对 Warning 的聚合。
 
 ## 13. 正确性边界
 

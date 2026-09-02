@@ -62,6 +62,8 @@ class PairResult:
 		reason: Human-readable explanation of the selected method and result.
 		children: Recursive child module pairs assumed by the parent proof.
 		log_path: Yosys log for the final method used by this obligation.
+		warnings: Reasons why a passing pair lacks a closed compositional
+			proof; empty for fully compositional passes and for failures.
 	"""
 
 	gold_module: str
@@ -71,6 +73,7 @@ class PairResult:
 	reason: str
 	children: tuple[tuple[str, str], ...]
 	log_path: Path
+	warnings: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -101,6 +104,17 @@ class HierarchicalResult:
 		"""
 
 		return self.oracle_equivalent is None or self.equivalent == self.oracle_equivalent
+
+	@property
+	def warnings(self) -> tuple[str, ...]:
+		"""Collect all fallback warnings from the completed pairs.
+
+		Returns:
+			One entry per relaxed pass, in pair completion order, without
+			deduplication.
+		"""
+
+		return tuple(warning for pair in self.pairs for warning in pair.warnings)
 
 
 @dataclass(frozen=True)
@@ -575,7 +589,9 @@ class _HierarchyRunner:
 		Completed pairs are returned from the cache. A compositional proof first
 		checks the parent with common child stubs, then recursively closes every
 		child obligation. Ambiguous hierarchy or failed obligations trigger a
-		full flatten of the current module subtree.
+		full flatten of the current module subtree. A pair that only passes
+		through flattening records warnings naming the proof obligations that
+		stayed open.
 
 		Args:
 			gold_name: Gold module name from the Gold inventory.
@@ -610,6 +626,8 @@ class _HierarchyRunner:
 		pair_dir = self.work_dir / "pairs" / f"{self.next_pair_index:04d}"
 		self.next_pair_index += 1
 
+		warnings: tuple[str, ...] = ()
+
 		if plan.fallback_reason is not None:
 			equivalent, log_path = _run_pair_proof(
 				self.config,
@@ -620,6 +638,11 @@ class _HierarchyRunner:
 				pair_dir,
 				flatten=True,
 			)
+			if equivalent:
+				warnings = (
+					f"({gold_name}, {gate_name}): pass relies on local "
+					f"flattening ({plan.fallback_reason})",
+				)
 			result = PairResult(
 				gold_module=gold_name,
 				gate_module=gate_name,
@@ -628,6 +651,7 @@ class _HierarchyRunner:
 				reason=plan.fallback_reason,
 				children=(),
 				log_path=log_path,
+				warnings=warnings,
 			)
 		else:
 			local_equivalent, log_path = _run_pair_proof(
@@ -643,12 +667,14 @@ class _HierarchyRunner:
 				(gold, gate) for _, gold, gate, recurse in plan.children if recurse
 			)
 			children_equivalent = True
+			failed_children: list[tuple[str, str]] = []
 			if local_equivalent:
 				for _, child_gold, child_gate, recurse in plan.children:
 					if not recurse:
 						continue
 					if not self.prove(child_gold, child_gate).equivalent:
 						children_equivalent = False
+						failed_children.append((child_gold, child_gate))
 			if local_equivalent and children_equivalent:
 				result = PairResult(
 					gold_module=gold_name,
@@ -669,6 +695,21 @@ class _HierarchyRunner:
 					pair_dir / "fallback",
 					flatten=True,
 				)
+				if fallback_equivalent:
+					if not local_equivalent:
+						warnings = (
+							f"({gold_name}, {gate_name}): parent compositional "
+							"proof failed; equivalence proven by locally "
+							"flattening the module subtree",
+						)
+					else:
+						warnings = tuple(
+							f"({gold_name}, {gate_name}): child pair "
+							f"({child_gold}, {child_gate}) is not equivalent in "
+							"isolation; equivalence only holds under this "
+							"module's connection context"
+							for child_gold, child_gate in failed_children
+						)
 				result = PairResult(
 					gold_module=gold_name,
 					gate_module=gate_name,
@@ -681,6 +722,7 @@ class _HierarchyRunner:
 					),
 					children=child_pairs,
 					log_path=fallback_log,
+					warnings=warnings,
 				)
 
 		self.active.remove(key)
@@ -705,6 +747,7 @@ def _write_report(result: HierarchicalResult) -> None:
 		"oracle_log_path": (
 			str(result.oracle_log_path) if result.oracle_log_path is not None else None
 		),
+		"warnings": list(result.warnings),
 		"pairs": [
 			{
 				**asdict(pair),
